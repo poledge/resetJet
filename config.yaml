@@ -1,0 +1,5 @@
+jet_list:
+- Goland
+- DataGrip
+reset_cooldown: 20
+last_reset: 2020-12-20T16:56:24.704612198+03:00
