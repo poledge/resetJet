@@ -5,8 +5,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
+	"os/user"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,7 +18,16 @@ import (
 var (
 	config      Config
 	dayDuration = time.Hour * 24
+	homeDir     string
 )
+
+func init() {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	homeDir = usr.HomeDir
+}
 
 // Config - Конфиг
 type Config struct {
@@ -74,34 +84,49 @@ func SaveConfig() (err error) {
 
 // ResetEval - Убиваю ключик активации
 func ResetEval(jetName string) (err error) {
-	_, err = exec.Command(`rm`, `-rf`, fmt.Sprintf(`~/.config/JetBrains/%s*/eval`, jetName)).Output()
+	files, err := filepath.Glob(fmt.Sprintf(`%s/.config/JetBrains/%s*`, homeDir, jetName))
 	if err != nil {
-		glog.Error(err)
 		return
 	}
-	glog.Infof(`Успешно убил ключик для %s`, jetName)
+	for _, file := range files {
+		err = os.RemoveAll(fmt.Sprintf(`%s/eval`, file))
+		if err != nil {
+			glog.Error(err)
+		}
+	}
+	if err == nil {
+		glog.Infof(`Успешно убил ключик для %s`, jetName)
+	}
 	return
 }
 
 // ResetOther - Убиваю other
 func ResetOther(jetName string) (err error) {
-	_, err = exec.Command(`rm`, `-rf`, fmt.Sprintf(`~/.config/JetBrains/%s*/options/other.xml`, jetName)).Output()
+	files, err := filepath.Glob(fmt.Sprintf(`%s/.config/JetBrains/%s*`, homeDir, jetName))
 	if err != nil {
-		glog.Error(err)
 		return
 	}
-	glog.Infof(`Успешно убил other для %s`, jetName)
+	for _, file := range files {
+		err = os.Remove(fmt.Sprintf(`%s/options/other.xml`, file))
+		if err != nil {
+			glog.Error(err)
+		}
+	}
+	if err == nil {
+		glog.Infof(`Успешно убил other для %s`, jetName)
+	}
 	return
 }
 
 // ResetJetBrains - Убиваю jetbrains
 func ResetJetBrains(jetName string) (err error) {
-	_, err = exec.Command(`rm`, `-rf`, fmt.Sprintf(`~/.java/.userPrefs/jetbrains/%s`, strings.ToLower(jetName))).Output()
+	err = os.RemoveAll(fmt.Sprintf(`%s/.java/.userPrefs/jetbrains/%s`, homeDir, strings.ToLower(jetName)))
 	if err != nil {
 		glog.Error(err)
-		return
 	}
-	glog.Infof(`Успешно убил jetbrains для %s`, jetName)
+	if err == nil {
+		glog.Infof(`Успешно убил jetbrains для %s`, jetName)
+	}
 	return
 }
 
@@ -113,18 +138,9 @@ func Resetter() (err error) {
 	}
 
 	for _, jetName := range config.JetList {
-		err = ResetEval(jetName)
-		if err != nil {
-			return
-		}
-		err = ResetOther(jetName)
-		if err != nil {
-			return
-		}
-		err = ResetJetBrains(jetName)
-		if err != nil {
-			return
-		}
+		ResetEval(jetName)
+		ResetOther(jetName)
+		ResetJetBrains(jetName)
 	}
 
 	err = SaveConfig()
